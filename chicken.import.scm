@@ -194,6 +194,7 @@
    repl
    repl-prompt
    repository-path
+   repository-pathspec
    require
    reset
    reset-handler

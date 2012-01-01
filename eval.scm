@@ -27,7 +27,7 @@
 
 (declare
   (unit eval)
-  (uses expand)
+  (uses expand data-structures)
   (hide ##sys#r4rs-environment ##sys#r5rs-environment 
 	##sys#interaction-environment pds pdss pxss d) 
   (not inline ##sys#repl-eval-hook ##sys#repl-read-hook ##sys#repl-print-hook 
@@ -1094,22 +1094,37 @@
 		   (check (##sys#substring p 0 (fx- n 1))) ]
 		  [else p] ) ) ) ) ) ) )
 
-(define ##sys#repository-path
-  (let ((rpath
-	 (if (##sys#fudge 22)		; private repository?
-	     (foreign-value "C_private_repository_path()" c-string)
-	     (or (get-environment-variable repository-environment-variable)
-		 (##sys#chicken-prefix 
-		  (##sys#string-append 
+(define ##sys#repository-path)
+(define ##sys#repository-pathspec)
+
+(let ((dpath (or (##sys#chicken-prefix
+		  (##sys#string-append
 		   "lib/chicken/"
-		   (##sys#number->string (##sys#fudge 42))) )
-		 install-egg-home))))
-    (lambda (#!optional val)
-      (if val
-	  (set! rpath val)
-	  rpath))))
+		   (##sys#number->string (##sys#fudge 42))))
+		 install-egg-home))
+      (split-pathspec (lambda (p)
+			(if p
+			    (string-split p ":" #t)        ;; FIXME: use ; on Windows
+			    '("")))))
+  (let ((rspec (if (##sys#fudge 22) ; private repository?  currently overrides repo path, shall we place in : instead?
+		   (list (foreign-value "C_private_repository_path()" c-string))
+		   (map (lambda (x)
+			  (if (string=? x "") dpath x))
+			(split-pathspec
+			 (get-environment-variable repository-environment-variable))))))
+    (set! ##sys#repository-pathspec
+	  (lambda (#!optional val)
+	    (if val
+		(set! rspec val)     ;; like original, won't #f arg not perform set! ?
+		rspec)))
+    (set! ##sys#repository-path
+	  (lambda (#!optional val)
+	    (if val
+		(set! rspec (list val))   ;; should we be able to zero this?
+		(and (pair? rspec) (car rspec)))))))
 
 (define repository-path ##sys#repository-path)
+(define repository-pathspec ##sys#repository-pathspec)
 
 (define ##sys#setup-mode #f)
 
