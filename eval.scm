@@ -1104,7 +1104,7 @@
 		 install-egg-home))
       (split-pathspec (lambda (p)
 			(if p
-			    (string-split p ":" #t)        ;; FIXME: use ; on Windows
+			    (string-split p ";" #t)
 			    '("")))))
   (let ((rspec (if (##sys#fudge 22) ; private repository?  currently overrides repo path, shall we place in : instead?
 		   (list (foreign-value "C_private_repository_path()" c-string))
