@@ -42,18 +42,22 @@
 
   (define (repo-path)
     (if (and *cross-chicken* (not *host-extensions*))
-	(make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION))
-	(repository-path)))
+	(list (make-pathname C_TARGET_LIB_HOME (sprintf "chicken/~a" C_BINARY_VERSION)))
+	(repository-pathspec)))
+  (define (pretty-repo-path)
+    (string-intersperse (repo-path) ";"))
 
-  (define (grep rx lst)
-    (filter (cut irregex-search rx <>) lst))
-
-  (define (gather-eggs patterns)
-    (let ((eggs (map pathname-file 
-		     (glob (make-pathname (repo-path) "*" "setup-info")))))
+  (define (gather-eggs patterns)  ; returns (("eggname" . "/path/to/repo") ...), preferring earliest path
+    (define (grep-car rx lst)
+      (filter (lambda (x) (irregex-search rx (car x))) lst))
+    (let ((eggs (append-map (lambda (path)
+			      (map (lambda (f)
+				     (cons (pathname-file f) path))
+				   (glob (make-pathname path "*" "setup-info"))))
+			    (repo-path))))
       (delete-duplicates
-       (concatenate (map (cut grep <> eggs) patterns))
-       string=?)))
+       (concatenate (map (cut grep-car <> eggs) patterns))
+       (lambda (x y) (string=? (car x) (car y))))))
 
   (define (format-string str cols #!optional right (padc #\space))
     (let* ((len (string-length str))
@@ -77,15 +81,16 @@
     (let ((w (quotient (- (get-terminal-width) 2) 2)))
       (for-each
        (lambda (egg)
-	 (let ((version (assq 'version (read-info egg (repo-path)))))
-	   (if version
-	       (print
-		(format-string (string-append egg " ") w #f #\.)
-		(format-string 
-		 (string-append " version: " (->string (cadr version)))
-		 w #t #\.))
-	       (print egg))))
-       (sort eggs string<?))))
+	 (let ((name (car egg)) (path (cdr egg)))
+	   (let ((version (assq 'version (read-info name path))))
+	     (if version
+		 (print
+		  (format-string (string-append name " ") w #f #\.)
+		  (format-string
+		   (string-append " version: " (->string (cadr version)))
+		   w #t #\.))
+		 (print name)))))
+       (sort eggs (lambda (x y) (string<? (car x) (car y)))))))
 
   (define (list-installed-files eggs)
     (for-each
@@ -93,10 +98,11 @@
      (sort
       (append-map
        (lambda (egg)
-	 (let ((files (assq 'files (read-info egg (repo-path)))))
-	   (if files
-	       (cdr files)
-	       '())))
+	 (let ((name (car egg)) (path (cdr egg)))
+	   (let ((files (assq 'files (read-info name path))))
+	     (if files
+		 (cdr files)
+		 '()))))
        eggs)
       string<?)))
 
@@ -137,10 +143,10 @@ EOF
 			   ((if files list-installed-files list-installed-eggs)
 			    eggs))))))
 	      (cond ((and *host-extensions* *target-extensions*)
-		     (print "host at " (repo-path) ":\n")
+		     (print "host at " (pretty-repo-path) ":\n")
 		     (status)
 		     (fluid-let ((*host-extensions* #f))
-		       (print "\ntarget at " (repo-path) ":\n")
+		       (print "\ntarget at " (pretty-repo-path) ":\n")
 		       (status)))
 		    (else (status))))
 	    (let ((arg (car args)))
