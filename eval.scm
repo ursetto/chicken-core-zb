@@ -1131,10 +1131,10 @@
 (define ##sys#find-extension
   (let ((string-append string-append) )
     (lambda (p inc?)
-      (let ((rp (##sys#repository-path)))
+      (let ((rps (##sys#repository-pathspec)))
 	(define (check path)
 	  (let ((p0 (string-append path "/" p)))
-	    (and (or (and rp
+	    (and (or (and (pair? rps)
 			  (not ##sys#dload-disabled)
 			  (##sys#fudge 24) ; dload?
 			  (file-exists? (##sys#string-append p0 ##sys#load-dynamic-extension)))
@@ -1142,7 +1142,7 @@
 		 p0) ) )
 	  (let loop ((paths (##sys#append
 			     (if ##sys#setup-mode '(".") '())
-			     (if rp (list rp) '())
+			     rps
 			     (if inc? ##sys#include-pathnames '())
 			     (if ##sys#setup-mode '() '("."))) ))
 	    (and (pair? paths)
