@@ -516,7 +516,7 @@ EOF
 		    (software-version)
 		    (build-platform)
 		    prefix
-		    (repository-path)
+		    (repository-pathspec)
 		    ##sys#include-pathnames
 		    (shorten (vector-ref sinfo 0))
 		    (shorten (vector-ref sinfo 1))
