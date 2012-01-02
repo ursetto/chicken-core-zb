@@ -1201,12 +1201,14 @@
 	[string-append string-append]
 	[read read] )
     (lambda (id loc)
-      (and-let* ((rp (##sys#repository-path)))
-	(let* ((p (##sys#canonicalize-extension-path id loc))
-	       (rpath (string-append rp "/" p ".")) )
-	  (cond ((file-exists? (string-append rpath setup-file-extension))
-		 => (cut with-input-from-file <> read) )
-		(else #f) ) ) ) ) ))
+      (let* ((p (##sys#canonicalize-extension-path id loc))
+	     (rfn (string-append "/" p "." setup-file-extension)))
+	(let loop ((rps (##sys#repository-pathspec)))
+	  (if (null? rps)
+	      #f
+	      (cond ((file-exists? (string-append (car rps) rfn))
+		     => (cut with-input-from-file <> read) )
+		    (else (loop (cdr rps))) )))) ) ))
 
 (define (extension-information ext)
   (##sys#extension-information ext 'extension-information) )
