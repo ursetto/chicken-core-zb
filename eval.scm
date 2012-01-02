@@ -1489,11 +1489,8 @@
       (or (test fname)
 	  (let loop ((paths (if repo
 				(##sys#append 
-				 ##sys#include-pathnames 
-				 (let ((rp (##sys#repository-path)))
-				   (if rp
-				       (list (##sys#repository-path))
-				       '())))
+				 ##sys#include-pathnames
+				 (##sys#repository-pathspec))
 				##sys#include-pathnames) ) )
 	    (cond ((eq? paths '()) fname)
 		  ((test (string-append (##sys#slot paths 0)
