@@ -1425,19 +1425,34 @@
 
 ;;; Load support files
 
+;; Load the specified identifier database from all repositories in order,
+;; skipping any identifiers from shadowed modules (seen in an earlier database).
 (define (load-identifier-database name)
-  (and-let* ((rp (repository-path))
-	     (dbfile (file-exists? (make-pathname rp name))))
-    (when verbose-mode
-      (printf "loading identifier database ~a ...~%" dbfile))
+  (let* ((seen (make-vector 301 '()))
+	 (was-seen (make-vector (##sys#size seen)))
+	 (seen? (cut ##sys#hash-table-ref was-seen <>))
+	 (seen! (cut ##sys#hash-table-set! seen <> #t)))
     (for-each
-     (lambda (e)
-       (let ((id (car e)))
-	 (##sys#put! 
-	  id '##core#db
-	  (append (or (##sys#get id '##core#db) '()) (list (cdr e))) )))
-     (read-file dbfile))))
-
+     (lambda (rp)
+       (and-let* ((dbfile (file-exists? (make-pathname rp name))))
+	 (when verbose-mode
+	   (printf "loading identifier database ~a ...~%" dbfile))
+	 (vector-copy! seen was-seen)  ; safe b/c values are not mutated or deleted
+	 (for-each
+	  (lambda (e)
+	    (let ((id (car e)) (mname (caddr e)))
+	      (cond ((not (seen? mname))
+		     (when verbose-mode
+		       (printf "  adding identifier ~a from ~a~%" id mname))
+		     (##sys#put!
+		      id '##core#db
+		      (append (or (##sys#get id '##core#db) '()) (list (cdr e))))
+		     (seen! mname))
+		    (else
+		     (when verbose-mode
+		       (printf "  skipped identifier ~a from ~a~%" id mname))))))
+	  (read-file dbfile))))
+     (repository-pathspec))))
 
 ;;; Print version/usage information:
 
