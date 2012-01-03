@@ -1441,16 +1441,11 @@
 	 (for-each
 	  (lambda (e)
 	    (let ((id (car e)) (mname (caddr e)))
-	      (cond ((not (seen? mname))
-		     (when verbose-mode
-		       (printf "  adding identifier ~a from ~a~%" id mname))
-		     (##sys#put!
-		      id '##core#db
-		      (append (or (##sys#get id '##core#db) '()) (list (cdr e))))
-		     (seen! mname))
-		    (else
-		     (when verbose-mode
-		       (printf "  skipped identifier ~a from ~a~%" id mname))))))
+	      (unless (seen? mname)
+		(##sys#put!
+		 id '##core#db
+		 (append (or (##sys#get id '##core#db) '()) (list (cdr e))))
+		(seen! mname))))
 	  (read-file dbfile))))
      (repository-pathspec))))
 
