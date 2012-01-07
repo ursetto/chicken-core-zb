@@ -919,52 +919,53 @@
 	       (display fname)
 	       (display " ...\n") 
 	       (flush-output)] )
-	(or (and fname
-		 (or (##sys#dload (##sys#make-c-string fname 'load) topentry #t) 
-		     (and (not (has-sep? fname))
-			  (##sys#dload 
-			   (##sys#make-c-string
-			    (##sys#string-append "./" fname) 
-			    'load) 
-			   topentry #t) ) ) )
-	    (call-with-current-continuation
-	     (lambda (abrt)
-	       (fluid-let ((##sys#read-error-with-line-number #t)
-			   (##sys#current-source-filename fname)
-			   (##sys#current-load-path
-			    (and fname
-				 (let ((i (has-sep? fname)))
-				   (if i (##sys#substring fname 0 (fx+ i 1)) "") ) ) )
-			   (##sys#abort-load (lambda () (abrt #f))) )
-		 (let ((in (if fname (open-input-file fname) input)))
-		   (##sys#dynamic-wind
-		    (lambda () #f)
-		    (lambda ()
-		      (let ((c1 (peek-char in)))
-			(when (char=? c1 (integer->char 127))
-			  (##sys#error 
-			   'load 
-			   (##sys#string-append 
-			    "unable to load compiled module - " 
-			    (or _dlerror "unknown reason"))
-			   fname)))
-		      (let ((x1 (read in)))
-			(do ((x x1 (read in)))
-			    ((eof-object? x))
-			  (when printer (printer x))
-			  (##sys#call-with-values
-			   (lambda () 
-			     (if timer
-				 (time (evproc x)) 
-				 (evproc x) ) )
-			   (lambda results
-			     (when pf
-			       (for-each
-				(lambda (r) 
-				  (write r)
-				  (newline) )
-				results) ) ) ) ) ) )
-		    (lambda () (close-input-port in)) ) ) ) ) ) )
+	(fluid-let ((##sys#current-source-filename fname)
+		    (##sys#current-load-path
+		     (and fname
+			  (let ((i (has-sep? fname)))
+			    (if i (##sys#substring fname 0 (fx+ i 1)) "")))))
+	  (or (and fname
+		   (or (##sys#dload (##sys#make-c-string fname 'load) topentry #t) 
+		       (and (not (has-sep? fname))
+			    (let ((fname (##sys#string-append "./" fname)))
+			      (fluid-let ((##sys#current-source-filename fname)
+					  (##sys#current-load-path "./"))
+				(##sys#dload
+				 (##sys#make-c-string fname 'load)
+				 topentry #t))) ) ) )
+	      (call-with-current-continuation
+	       (lambda (abrt)
+		 (fluid-let ((##sys#read-error-with-line-number #t)
+			     (##sys#abort-load (lambda () (abrt #f))) )
+		   (let ((in (if fname (open-input-file fname) input)))
+		     (##sys#dynamic-wind
+		      (lambda () #f)
+		      (lambda ()
+			(let ((c1 (peek-char in)))
+			  (when (char=? c1 (integer->char 127))
+			    (##sys#error 
+			     'load 
+			     (##sys#string-append 
+			      "unable to load compiled module - " 
+			      (or _dlerror "unknown reason"))
+			     fname)))
+			(let ((x1 (read in)))
+			  (do ((x x1 (read in)))
+			      ((eof-object? x))
+			    (when printer (printer x))
+			    (##sys#call-with-values
+			     (lambda () 
+			       (if timer
+				   (time (evproc x)) 
+				   (evproc x) ) )
+			     (lambda results
+			       (when pf
+				 (for-each
+				  (lambda (r) 
+				    (write r)
+				    (newline) )
+				 results) ) ) ) ) ) )
+		     (lambda () (close-input-port in)) ) ) ) ) ) ))
 	(##core#undefined) ) ) )
   (set! load
     (lambda (filename . evaluator)
