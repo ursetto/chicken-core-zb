@@ -519,43 +519,54 @@
       (and-let* ((tmpdir (temporary-directory)))
         (remove-directory tmpdir))))
 
-  (define (update-db)
-    (let* ((files (glob (make-pathname (repository-path) "*.import.*")))
-           (tmpdir (create-temporary-directory))
-           (dbfile (make-pathname tmpdir +module-db+))
-           (rx (irregex ".*/([^/]+)\\.import\\.(scm|so)")))
+  ;; Create the +module-db+ file in repository PATH by loading all .import.* files
+  ;; in that directory and then walking the module table.  Import files can import other
+  ;; modules recursively; since those may reside in another repository, we filter out
+  ;; any modules in the table not loaded directly from PATH.
+  (define (update-db path)
+    (let* ((path (make-pathname path #f))  ;; match ##sys#module-path's trailing forward slash
+	   (files (glob (make-pathname path "*.import.*")))
+	   (tmpdir (create-temporary-directory))
+	   (dbfile (make-pathname tmpdir +module-db+))
+	   (rx (irregex ".*/([^/]+)\\.import\\.(scm|so)")))
       (print "loading import libraries ...")
       (fluid-let ((##sys#warnings-enabled #f))
-        (for-each
-         (lambda (f)
-           (let ((m (irregex-match rx f)))
+	(for-each
+	 (lambda (f)
+	   (let ((m (irregex-match rx f)))
 	     (handle-exceptions ex
 		 (print-error-message 
 		  ex (current-error-port) 
 		  (sprintf "Failed to import from `~a'" f))
 	       (eval `(import ,(string->symbol (irregex-match-substring m 1)))))))
-         files))
-      (print "generating database")
+	 files))
+      (print "generating database for " path)
       (let ((db
-             (sort
-              (append-map
-               (lambda (m)
-                 (let* ((mod (cdr m))
-                        (mname (##sys#module-name mod)))
-                   (print* " " mname)
-                   (let-values (((_ ve se) (##sys#module-exports mod)))
-                     (append
-                      (map (lambda (se) (list (car se) 'syntax mname)) se)
-                      (map (lambda (ve) (list (car ve) 'value mname)) ve)))))
-               ##sys#module-table)
-              (lambda (e1 e2)
-                (string<? (symbol->string (car e1)) (symbol->string (car e2)))))))
-        (newline)
-        (with-output-to-file dbfile
-          (lambda ()
-            (for-each (lambda (x) (write x) (newline)) db)))
-        (copy-file dbfile (make-pathname (repository-path) +module-db+))
-        (remove-directory tmpdir))))
+	     (sort
+	      (append-map
+	       (lambda (m)
+		 (let* ((mod (cdr m))
+			(mname (##sys#module-name mod))
+			(mpath (##sys#module-path mod)))
+		   (cond ((string=? mpath path)
+			  (print* " " mname)
+			  (let-values (((_ ve se) (##sys#module-exports mod)))
+			    (append
+			     (map (lambda (se) (list (car se) 'syntax mname)) se)
+			     (map (lambda (ve) (list (car ve) 'value mname)) ve))))
+			 (else '()))))
+	       ##sys#module-table)
+	      (lambda (e1 e2)
+		(string<? (symbol->string (car e1)) (symbol->string (car e2)))))))
+	(newline)
+	(with-output-to-file dbfile
+	  (lambda ()
+	    (for-each (lambda (x) (write x) (newline)) db)))
+	(copy-file dbfile (make-pathname path +module-db+) #t ".") ;; repos are relative to CWD
+	(remove-directory tmpdir))))
+
+  (define (update-db-all)
+    (for-each update-db (repository-pathspec)))
 
   (define (apply-mappings eggs)
     (define (canonical x)
@@ -647,7 +658,7 @@ EOF
                (cond ((and *deploy* (not *prefix*))
 		      (error 
 		       "`-deploy' only makes sense in combination with `-prefix DIRECTORY`"))
-		     (update (update-db))
+		     (update (update-db-all))
                      (else
 		      (let ((defaults (load-defaults)))
 			(when (null? eggs)
