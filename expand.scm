@@ -1610,7 +1610,7 @@
 (define-record-type module
   (%make-module name export-list defined-list exist-list defined-syntax-list
 		undefined-list import-forms meta-import-forms meta-expressions 
-		vexports sexports) 
+		vexports sexports path)
   module?
   (name module-name)			; SYMBOL
   (export-list module-export-list set-module-export-list!) ; (SYMBOL | (SYMBOL ...) ...)
@@ -1622,9 +1622,12 @@
   (meta-import-forms module-meta-import-forms set-module-meta-import-forms!)	    ; (SPEC ...)
   (meta-expressions module-meta-expressions set-module-meta-expressions!) ; (EXP ...)
   (vexports module-vexports set-module-vexports!)	      ; ((SYMBOL . SYMBOL) ...)
-  (sexports module-sexports set-module-sexports!) )	      ; ((SYMBOL SE TRANSFORMER) ...)
+  (sexports module-sexports set-module-sexports!)	      ; ((SYMBOL SE TRANSFORMER) ...)
+  (path module-path)					      ; STRING or #f (from current-load-path)
+  )
 
 (define ##sys#module-name module-name)
+(define ##sys#module-path module-path)
 
 (define (##sys#module-exports m)
   (values 
@@ -1633,7 +1636,7 @@
    (module-sexports m)))
 
 (define (make-module name explist vexports sexports)
-  (%make-module name explist '() '() '() '() '() '() '() vexports sexports))
+  (%make-module name explist '() '() '() '() '() '() '() vexports sexports ##sys#current-load-path))
 
 (define (##sys#find-module name #!optional (err #t))
   (cond ((assq name ##sys#module-table) => cdr)
