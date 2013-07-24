@@ -688,7 +688,7 @@ EOF
                             (string=? arg "--help"))
                         (usage 0))
                        ((string=? arg "-repository")
-                        (print (repository-path))
+                        (print (string-intersperse (repository-pathspec) ";"))
                         (exit 0))
                        ((string=? arg "-force")
                         (set! *force* #t)
